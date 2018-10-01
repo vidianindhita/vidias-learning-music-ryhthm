@@ -1,85 +1,237 @@
-var synth = new Tone.PluckSynth().toMaster()
-var polySynth = new Tone.PolySynth(4, Tone.Synth).toMaster();
+// Sequencer
+var nSteps = 8;
+var nTracks = 4;
+var cells = [];
+var playButton;
+var beats = 0;
+var currentStep = 0;
 
-//this function is called right before the scheduled time
-function triggerSynth(time){
-	//the time is the sample-accurate time of the event
-	polySynth.triggerAttackRelease(['C4', 'E4', 'G4', 'B4'], '4n', time)
-}
+// Sound
+var kit;
+var drumNames = ["bass", "drum", "clap", "ring"];
+kit = new Tone.Players(
+    { 
+      "bass" : "assets/sounds/bass.wav",
+      "drum" : "assets/sounds/drum.wav",
+      "clap" : "assets/sounds/clap.wav",
+      "ring" : "assets/sounds/ring.wav"
+    }
+);
+kit.toMaster();
+Tone.Transport.scheduleRepeat(onBeat, 0.5);
 
-function triggerSynth3(time){
-	//the time is the sample-accurate time of the event
-	polySynth.triggerAttackRelease(['D4', 'F4', 'A4', 'C5'], '4n', time)
-}
+// Visuals
+var cellWidth, cellHeight;
 
-function triggerSynth2(time){
-	//the time is the sample-accurate time of the event
-	synth.triggerAttackRelease('C1', '4n', time)
-}
+// Melody
+let octave = 4;
 
-//schedule a few notes
-Tone.Transport.schedule(triggerSynth, '0:1')
-Tone.Transport.schedule(triggerSynth3, '0:3')
-Tone.Transport.schedule(triggerSynth, '1:1')
-Tone.Transport.schedule(triggerSynth3, '1:3')
-Tone.Transport.schedule(triggerSynth, '2:1')
-Tone.Transport.schedule(triggerSynth3, '2:3')
-Tone.Transport.schedule(triggerSynth, '3:1')
-Tone.Transport.schedule(triggerSynth3, '3:3')
+const keys = [];
+let prevKey = 0;
 
-Tone.Transport.schedule(triggerSynth2, '0:1')
-Tone.Transport.schedule(triggerSynth2, '0:3')
-Tone.Transport.schedule(triggerSynth2, '1:1')
-Tone.Transport.schedule(triggerSynth2, '1:3')
-Tone.Transport.schedule(triggerSynth2, '2:1')
-Tone.Transport.schedule(triggerSynth2, '2:3')
+const Instruments = {
+  keyboard: {
+    // Lower octave.
+    'a': 'Cl',
+    'w': 'C#l',
+    's': 'Dl',
+    'e': 'D#l',
+    'd': 'El',
+    'f': 'Fl',
+    't': 'F#l',
+    'g': 'Gl',
+    'y': 'G#l',
+    'h': 'Al',
+    'u': 'A#l',
+    'j': 'Bl',
+    // Upper octave.
+    'k': 'Cu',
+    'o': 'C#u',
+    'l': 'Du',
+    'p': 'D#u',
+    ';': 'Eu',
+    "'": 'Fu',
+    ']': 'F#u',
+    '\\': 'Gu',
+  },
+};
 
-Tone.Transport.schedule(triggerSynth2, '3:0:2')
-Tone.Transport.schedule(triggerSynth2, '3:1:2')
-Tone.Transport.schedule(triggerSynth2, '3:2:2')
-Tone.Transport.schedule(triggerSynth2, '3:3:2')
+let instrument = Instruments.keyboard;
 
-//set the transport to repeat
-Tone.Transport.loopEnd = '4m'
-Tone.Transport.loop = true
+const keyToNote = key => {
+  const note = instrument[ key ];
+  if ( !note ) {
+    return;
+  }
 
-//start/stop the transport
-document.querySelector('.playToggle').addEventListener('change', function(e){
-	if (e.target.checked){
-		Tone.Transport.start('+0.1')
-	} else {
-		Tone.Transport.stop()
-	}
-})
+  return Tone.Frequency(
+    note
+      .replace( 'l', octave )
+      .replace( 'u', octave + 1 )
+  ).toNote();
+};
 
-var diameter; 
-var angle = 0;
+const onKeyDown = (() => {
+  let listener;
+
+  return synth => {
+    document.removeEventListener( 'keydown', listener );
+
+    listener = event => {
+      const { key } = event;
+
+      // Only trigger once per keydown event.
+      if ( !keys[ key ] ) {
+        keys[ key ] = true;
+
+        const note = keyToNote( key );
+        if ( note ) {
+          synth.triggerAttack( note );
+          prevKey = key;
+        }
+      }
+    };
+
+    document.addEventListener( 'keydown', listener );
+  };
+})();
+
+const onKeyUp = (() => {
+  let listener;
+  let prev;
+
+  return synth => {
+    // Clean-up.
+    if ( prev ) {
+      prev.triggerRelease();
+    }
+
+    document.removeEventListener( 'keyup', listener );
+
+    prev = synth;
+    listener = event => {
+      const { key } = event;
+      if ( keys[ key ] ) {
+        keys[ key ] = false;
+
+        const note = keyToNote( key );
+        if ( synth instanceof Tone.PolySynth ) {
+          synth.triggerRelease( note );
+        } else if ( note && key === prevKey ) {
+          // Trigger release if this is the previous note played.
+          synth.triggerRelease();
+        }
+      }
+    };
+
+    document.addEventListener( 'keyup', listener );
+  };
+})();
 
 function setup() {
-	createCanvas(windowWidth, windowHeight);
-  	diameter = height - 10;
-  	noStroke();
-  	fill(255, 204, 0);
+  // Initialize all sequencer cells. ON: 1. OFF: -1.
+  for(var track = 0; track < nTracks; track++){
+    cells[track] = [];
+    for(var step = 0; step < nSteps; step++){
+        cells[track][step] = -1;
+    }
+  }
+  
+  playButton = createButton('Play');
+  // playButton.position(630, 445);
+  playButton.mouseClicked(togglePlay);
+	
+  createCanvas(600, 300);
+  cellWidth = width / nSteps;
+  cellHeight = height / nTracks;
+  
 }
 
-function draw() {
-	var input = Tone.Transport.position;
-	var values = input.split(':');
-	var beatValue = values[2];
-	var beatNumber = values[1];
-	var timeInput = Tone.now();
-
-	background(255);
-
-	var d1 = 10 + (sin(angle) * diameter/2) + diameter/2;
-  	var d2 = 10 + (sin(angle + PI/2) * diameter/2) + diameter/2;
-  	var d3 = 10 + (sin(angle + PI) * diameter/2) + diameter/2;
-
-  	ellipse(0, height/2, (d1*beatValue), (d1*beatValue));
-  	ellipse(width, height/2, (d3*beatValue), (d3*beatValue));
-
-  	// noStroke();
-  	// fill(255, 204, 0);
-
-	console.log("Beat: "+beatValue);
+function onBeat(time){
+  for(var track = 0; track < nTracks; track++){
+    if(cells[track][currentStep] == 1){
+      var drum = kit.get(drumNames[track]);
+      drum.start(time);
+    }
+  }
+  beats++;
+  currentStep = beats % nSteps;
 }
+
+function draw(){
+  background(255);
+  stroke(0);
+  
+  // Draw cells that are on
+  for(var step = 0; step < nSteps; step++){
+    for(var track = 0; track < nTracks; track++){
+      if(cells[track][step] == 1){
+        fill(150 - track*30);
+        rect(step*cellWidth, track*cellHeight, cellWidth, cellHeight);
+      }
+    }
+  }
+  
+  // Draw horizontal lines
+  for(var i = 1; i <= nTracks; i++){
+    var y = i*cellHeight;
+    line(0, y, width, y);
+  }
+  
+  // Draw vertical lines
+  for(var i = 1; i <= nSteps; i++){
+    stroke(0);
+    line(i*cellWidth, 0, i*cellWidth, height);
+  }
+  
+  // Highlight current step
+  var highlight = (beats - 1 )% nSteps;
+	fill(200, 60);
+	noStroke();
+	rect(highlight*cellWidth, 0, cellWidth, height)
+	
+}
+
+function mousePressed(){
+  // If the mouse is within the bounds of the canvas
+  if(	0 < mouseX && mouseX < width &&
+    	0 < mouseY && mouseY < height){
+    
+    // Determine which cell the mouse is on
+    var i = floor(mouseX / cellWidth);
+    var j = floor(mouseY / cellHeight);
+    
+    // Toggle cell on/off
+    cells[j][i] = -cells[j][i];
+  }
+  
+}
+
+function togglePlay(){
+  if(Tone.Transport.state == "started"){
+  	Tone.Transport.stop();
+    playButton.html('Play');
+  }
+  else{
+  	Tone.Transport.start();
+    playButton.html('Stop');
+  }
+	
+}
+
+// Octave controls.
+document.addEventListener( 'keydown', event => {
+  // Decrease octave range (min: 0).
+  if ( event.key === 'z' ) { octave = Math.max( octave - 1, 0 ); }
+  // Increase octave range (max: 10).
+  if ( event.key === 'x' ) { octave = Math.min( octave + 1, 9 ); }
+});
+
+// Init.
+(() => {
+  const synth = new Tone.PolySynth( 10 );
+  synth.toMaster();
+
+  onKeyDown( synth );
+  onKeyUp( synth );
+})();

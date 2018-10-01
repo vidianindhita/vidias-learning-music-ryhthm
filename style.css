@@ -8,12 +8,12 @@ html, body {
 }
 
 .title {
-	margin-top: 100px;
+	margin-top: 50px;
 }
 
 .buttonPlay {
 	text-align: center;
-	margin-top: 50px;
+	margin-top: 40px;
 	margin-bottom: 50px;
 }
 
@@ -29,53 +29,33 @@ p {
 	font-family: Lato;
 	color: #3d3d3d;
 	font-weight: 100;
+  font-size: 20px;
 }
 
-.patatap, .p5Canvas {
-	margin-left: auto;
+.p5Canvas {
+    margin-left: 340px;
     margin-right: auto;
+    margin-top: 10px;
 }
 
-.switch input {
-	display: none;
-	text-align: center;
-	}
-
-.slider {
-  	position: absolute;
-  	cursor: pointer;
-	background-color: #ccc;
-  	-webkit-transition: .4s;
-  	transition: .4s;
-  	width: 100px;
-  	height: 54px;
-  	margin-left: auto;
-  	margin-right: auto;
-}
-
-.slider:before {
+button {
   position: absolute;
-  content: "";
-  height: 46px;
-  width: 46px;
-  left: 4px;
-  bottom: 4px;
-  top: 4px;
-  background-color: white;
-  -webkit-transition: .4s;
-  transition: .4s;
+  left: 960px;
+  top: 200px;
+  background-color: #f4511e;
+  border: none;
+  color: white;
+  padding: 16px 32px;
+  text-align: center;
+  font-size: 16px;
+  margin: 4px 2px;
+  opacity: 0.6;
+  transition: 0.3s;
+  display: inline-block;
+  text-decoration: none;
+  cursor: pointer;
 }
 
-input:checked + .slider {
-  background-color: #2196F3;
-}
-
-input:focus + .slider {
-  box-shadow: 0 0 1px #2196F3;
-}
-
-input:checked + .slider:before {
-  -webkit-transform: translateX(46px);
-  -ms-transform: translateX(46px);
-  transform: translateX(46px);
+button:hover {
+  opacity: 1;
 }
